@@ -109,15 +109,15 @@ def init_sqlite_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS trusted_contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone_number TEXT, priority INTEGER UNIQUE)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS sos_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, location TEXT, timestamp TEXT, status TEXT, route_captured TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS audio_evidence (id INTEGER PRIMARY KEY AUTOINCREMENT, file_path TEXT, timestamp TEXT)''')
-
-    cursor.execute("SELECT COUNT(*) FROM users")
+    cursor.execute('''CREATE TABLE IF NOT EXISTS community_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, latitude REAL, longitude REAL, rating INTEGER, description TEXT, incident_type TEXT, time_of_day TEXT, submitted_at TEXT)''')
+    cursor.execute('SELECT COUNT(*) FROM users')
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO users (name, email, phone) VALUES (?, ?, ?)", ("", "", ""))
         cursor.execute("INSERT INTO emergency_profile (blood_group, allergies, medications, medical_conditions, age, gender) VALUES (?, ?, ?, ?, ?, ?)", ("", "", "", "", "", ""))
-    cursor.execute("SELECT COUNT(*) FROM trusted_contacts")
+    cursor.execute('SELECT COUNT(*) FROM trusted_contacts')
     if cursor.fetchone()[0] == 0:
         for i in range(1, 4):
-            cursor.execute("INSERT INTO trusted_contacts (name, phone_number, priority) VALUES (?, ?, ?)", ("", "", i))
+            cursor.execute('INSERT INTO trusted_contacts (name, phone_number, priority) VALUES (?, ?, ?)', ('', '', i))
     conn.commit()
     conn.close()
 
@@ -360,6 +360,14 @@ def report_safety():
         "submitted_at": datetime.datetime.utcnow().isoformat()
     }
     result = reports_col.insert_one(report)
+
+    # Insert report into SQLite community_reports table for local persistence
+    conn = get_db()
+    conn.execute('''INSERT INTO community_reports (latitude, longitude, rating, description, incident_type, time_of_day, submitted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)''',
+        (lat, lng, report['rating'], report['description'], report['incident_type'], report['time_of_day'], report['submitted_at']))
+    conn.commit()
+    conn.close()
 
     # Compute synthetic safety_score from user rating (1-5 → 0.0-1.0)
     rating = report['rating']
