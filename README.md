@@ -166,6 +166,6 @@ Works on desktop and mobile browsers. For mobile testing, use your machine's loc
 
 | | Name |
 |---|---|
-| 👩‍💻 | Shravani Dhuri |
+| 👩‍💻 | bahuli1203 |
 | 👩‍💻 | Shreya Boda |
 | 👩‍💻 | Manasvi Chauhan |
