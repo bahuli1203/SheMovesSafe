@@ -336,64 +336,57 @@ def area_safety():
 
 @app.route('/api/report-safety', methods=['POST'])
 def report_safety():
-    """Accept community safety reports and store in MongoDB."""
-    if not MONGO_AVAILABLE:
-        return jsonify({"error": "MongoDB not available"}), 503
-
+    """Accept community safety reports and store them in SQLite and MongoDB (if available)."""
     data = request.json or {}
-    required = ['latitude', 'longitude']
+    required = ['latitude', 'longitude', 'rating', 'incident_type', 'time_of_day']
     for f in required:
         if f not in data:
             return jsonify({"error": f"Missing field: {f}"}), 400
 
+    # Extract and cast fields
     lat = float(data['latitude'])
     lng = float(data['longitude'])
+    rating = int(data['rating'])
+    incident_type = data['incident_type']
+    time_of_day = data['time_of_day']
+    submitted_at = data.get('submitted_at') or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    city = data.get('city', 'Community')
+    area = data.get('area', 'Reported Area')
+    description = data.get('description', '')
 
-    report = {
-        "latitude": lat,
-        "longitude": lng,
-        "location": {"type": "Point", "coordinates": [lng, lat]},
-        "rating": int(data.get('rating', 3)),           # 1-5 stars
-        "description": data.get('description', ''),
-        "incident_type": data.get('incident_type', 'General'),
-        "time_of_day": data.get('time_of_day', 'Unknown'),
-        "submitted_at": datetime.datetime.utcnow().isoformat()
-    }
-    result = reports_col.insert_one(report)
-
-    # Insert report into SQLite community_reports table for local persistence
+    # Store in SQLite community_reports table
     conn = get_db()
-    conn.execute('''INSERT INTO community_reports (latitude, longitude, rating, description, incident_type, time_of_day, submitted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)''',
-        (lat, lng, report['rating'], report['description'], report['incident_type'], report['time_of_day'], report['submitted_at']))
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO community_reports (latitude, longitude, rating, description, incident_type, time_of_day, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (lat, lng, rating, description, incident_type, time_of_day, submitted_at)
+    )
+    sqlite_id = cur.lastrowid
     conn.commit()
     conn.close()
 
-    # Compute synthetic safety_score from user rating (1-5 → 0.0-1.0)
-    rating = report['rating']
-    synthetic_score = rating / 5.0
-    # Also inject this as a lightweight safety record to influence future scores
-    safety_col.insert_one({
-        "incident_id": f"report_{str(result.inserted_id)}",
-        "city": data.get('city', 'Community'),
-        "area": data.get('area', 'Reported Area'),
-        "latitude": lat,
-        "longitude": lng,
-        "location": {"type": "Point", "coordinates": [lng, lat]},
-        "crime_type": report['incident_type'],
-        "crime_count": max(0, (5 - rating) * 10),  # inverse of rating
-        "time_of_day": report['time_of_day'],
-        "lighting_score": rating * 2.0,
-        "police_station_distance_km": 2.5,
-        "crowd_density": 300,
-        "weather_condition": "Clear",
-        "safety_score": synthetic_score,
-        "risk_level": "Low" if rating >= 4 else ("Medium" if rating >= 2 else "High"),
-        "incident_timestamp": report['submitted_at'],
-        "source": "community_report"
-    })
+    # Store in MongoDB if available
+    mongo_id = None
+    if MONGO_AVAILABLE:
+        result = reports_col.insert_one({
+            "latitude": lat,
+            "longitude": lng,
+            "rating": rating,
+            "description": description,
+            "incident_type": incident_type,
+            "time_of_day": time_of_day,
+            "submitted_at": submitted_at,
+            "city": city,
+            "area": area,
+            "source": "community_report"
+        })
+        mongo_id = str(result.inserted_id)
 
-    return jsonify({"message": "Safety report submitted successfully. Thank you!", "report_id": str(result.inserted_id)})
+    return jsonify({
+        "message": "Safety report submitted successfully. Thank you!",
+        "sqlite_id": sqlite_id,
+        "mongo_id": mongo_id
+    })
 
 @app.route('/api/dashboard-stats', methods=['GET'])
 def dashboard_stats():
