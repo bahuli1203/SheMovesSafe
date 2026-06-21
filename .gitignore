@@ -1,0 +1,19 @@
+# Database
+shemovessafe.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local Evidence Audio files (except structure)
+evidence/audio/*
+!evidence/audio/.gitkeep
+
+# Environment variables
+.env
+.venv/
+env/
+venv/
+ENV/

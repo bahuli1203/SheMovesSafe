@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SheMovesSafe – AI Women Safety Navigator</title>
+    <meta name="description" content="SheMovesSafe is an AI-powered women's safety navigation app providing safe route recommendations based on real crime data, local feedback, and police accessibility.">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Splash Screen -->
+    <div id="splash-screen">
+        <div class="splash-content">
+            <div class="logo-pulse">🛡️</div>
+            <h1>SheMovesSafe</h1>
+            <p>AI-Powered Women's Safety Navigator</p>
+            <div class="splash-loader"><div class="splash-bar"></div></div>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="nav-logo">🛡️</span>
+            <span class="nav-title">SheMovesSafe</span>
+        </div>
+        <div class="nav-center">
+            <div class="nav-stat-pill" id="nav-safe-pill">
+                <span class="dot safe-dot"></span><span id="nav-safe-count">–</span> Safe Zones
+            </div>
+            <div class="nav-stat-pill" id="nav-risky-pill">
+                <span class="dot risky-dot"></span><span id="nav-risky-count">–</span> High Risk
+            </div>
+        </div>
+        <!-- Hamburger button (mobile only) -->
+        <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu" aria-expanded="false">
+            <span></span><span></span><span></span>
+        </button>
+        <!-- Nav links (desktop always visible; mobile dropdown) -->
+        <div class="nav-links" id="nav-links">
+            <a href="#" class="nav-link active">Home</a>
+            <a href="#" id="about-link" class="nav-link">About</a>
+            <a href="#" id="contact-link" class="nav-link">Contact</a>
+        </div>
+    </nav>
+
+    <div class="app-container">
+        <!-- Sidebar / Control Panel -->
+        <div class="control-panel">
+            <div class="header">
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <h1>SheMovesSafe</h1>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+                            <div class="ai-badge">AI Powered</div>
+                            <div class="ai-badge" style="background:rgba(16,185,129,0.15);color:#10b981;border-color:rgba(16,185,129,0.3);">20K+ Records</div>
+                        </div>
+                    </div>
+                    <button id="theme-toggle" title="Toggle Dark/Light Mode"
+                        style="background:none;border:none;font-size:1.5em;cursor:pointer;">🌙</button>
+                </div>
+                <p style="margin-top:8px;">Find the safest route, not just the fastest.</p>
+            </div>
+
+            <!-- Dashboard Stats Strip -->
+            <div class="stats-strip" id="stats-strip">
+                <div class="stat-card stat-safe">
+                    <div class="stat-num" id="stat-safe">–</div>
+                    <div class="stat-label">Safe Areas</div>
+                </div>
+                <div class="stat-card stat-moderate">
+                    <div class="stat-num" id="stat-moderate">–</div>
+                    <div class="stat-label">Moderate</div>
+                </div>
+                <div class="stat-card stat-risky">
+                    <div class="stat-num" id="stat-risky">–</div>
+                    <div class="stat-label">High Risk</div>
+                </div>
+                <div class="stat-card stat-avg">
+                    <div class="stat-num" id="stat-avg">–</div>
+                    <div class="stat-label">Avg Score</div>
+                </div>
+            </div>
+
+            <!-- Map Controls Strip -->
+            <div class="map-controls-strip">
+                <label class="toggle-switch" title="Toggle Safety Zones">
+                    <input type="checkbox" id="zones-toggle" checked>
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">🔵 Zones</span>
+                </label>
+            </div>
+
+            <!-- Tabs -->
+            <div class="panel-tabs">
+                <button class="tab-btn active" data-tab="route-tab">🚶 Routes</button>
+                <button class="tab-btn" data-tab="safety-tab">🛡️ Safety</button>
+                <button class="tab-btn" data-tab="report-tab">📢 Report</button>
+                <button class="tab-btn" data-tab="profile-tab">👤 Profile</button>
+                <button class="tab-btn" data-tab="vault-tab">📂 Vault</button>
+            </div>
+
+            <!-- TAB 1: ROUTES -->
+            <div id="route-tab" class="tab-content">
+                <div class="input-group">
+                    <div class="autocomplete-wrapper">
+                        <div class="input-wrapper">
+                            <span class="icon">🟢</span>
+                            <input type="text" id="start-loc" placeholder="Enter Start Location" autocomplete="off">
+                            <button id="gps-btn" title="Use Current Location">🎯</button>
+                        </div>
+                        <div class="autocomplete-dropdown hidden" id="start-dropdown"></div>
+                    </div>
+                    <div class="connector-line"></div>
+                    <div class="autocomplete-wrapper">
+                        <div class="input-wrapper">
+                            <span class="icon">📍</span>
+                            <input type="text" id="dest-loc" placeholder="Enter Destination" autocomplete="off">
+                        </div>
+                        <div class="autocomplete-dropdown hidden" id="dest-dropdown"></div>
+                    </div>
+                </div>
+
+                <div class="transport-modes">
+                    <label class="mode-option">
+                        <input type="radio" name="transport" value="walking" checked>
+                        <span>🚶 Walk</span>
+                    </label>
+                    <label class="mode-option">
+                        <input type="radio" name="transport" value="scooter">
+                        <span>🛵 Scooter</span>
+                    </label>
+                    <label class="mode-option">
+                        <input type="radio" name="transport" value="car">
+                        <span>🚗 Car</span>
+                    </label>
+                </div>
+
+                <button id="find-routes-btn" class="primary-btn">🔍 Find Safe Routes</button>
+
+                <div id="loading" class="hidden">
+                    <div class="spinner"></div>
+                    Analyzing safety data across route...
+                </div>
+
+                <!-- Route Warning Banner -->
+                <div id="route-warning" class="route-warning-banner hidden"></div>
+
+                <!-- Route List -->
+                <div id="routes-list" class="routes-container hidden"></div>
+
+                <!-- AI Panel -->
+                <div id="ai-panel" class="ai-panel hidden">
+                    <div class="ai-header">
+                        <span class="gemini-icon">✨</span> Gemini Safety Analysis
+                    </div>
+                    <div class="safest-header" id="safest-header" style="display:none;margin-bottom:8px;">
+                        <h4 style="color:#22c55e;margin:0;font-size:1.1em;">🏆 Safest Route Recommended</h4>
+                        <div style="font-size:0.9em;display:flex;gap:15px;margin-top:4px;">
+                            <span>Score: <strong id="safest-score-val">–/100</strong></span>
+                            <span>Risk: <strong id="safest-risk-val" style="color:#22c55e;">–</strong></span>
+                        </div>
+                    </div>
+                    <p id="ai-text">Thinking...</p>
+                </div>
+            </div>
+
+            <!-- TAB 2: SAFETY CENTER -->
+            <div id="safety-tab" class="tab-content hidden">
+                <div class="safety-card glass-card">
+                    <h3>⏱️ Check-In Timer</h3>
+                    <p class="card-desc">If you don't check in before the timer expires, an automatic SOS will trigger.</p>
+                    <div id="timer-setup-view">
+                        <div class="timer-options">
+                            <button class="timer-opt-btn" data-time="15">15 Min</button>
+                            <button class="timer-opt-btn" data-time="30">30 Min</button>
+                            <button class="timer-opt-btn" data-time="60">1 Hour</button>
+                            <button class="timer-opt-btn" data-time="custom">Custom</button>
+                        </div>
+                        <div class="custom-timer-input hidden" id="custom-timer-wrapper" style="margin-top:10px;">
+                            <input type="number" id="custom-timer-val" placeholder="Minutes" min="1" max="1440">
+                        </div>
+                        <button id="start-timer-btn" class="primary-btn" style="margin-top:15px;">Start Check-In</button>
+                    </div>
+                    <div id="active-timer-display" class="active-timer-container hidden" style="text-align:center;padding:15px 0;">
+                        <div class="check-in-title">Check-In Remaining:</div>
+                        <div class="countdown-text" id="checkin-countdown">15:00</div>
+                        <div class="timer-actions" style="display:flex;gap:10px;margin-top:15px;">
+                            <button id="confirm-safe-btn" class="primary-btn" style="background-color:#22c55e;">I am Safe ✓</button>
+                            <button id="cancel-timer-btn" class="sos-btn" style="margin:0;flex:1;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="safety-card glass-card" style="margin-top:15px;">
+                    <h3>📱 Device Health</h3>
+                    <div class="status-indicator">
+                        <span>🔋 Battery:</span>
+                        <strong id="battery-status-text" class="status-value text-safe">Checking...</strong>
+                    </div>
+                    <div class="status-indicator" style="margin-top:10px;">
+                        <span>🌐 Network:</span>
+                        <strong id="network-status-text" class="status-value text-safe">Online</strong>
+                    </div>
+                </div>
+
+                <!-- Area Safety Quick Lookup -->
+                <div class="safety-card glass-card" style="margin-top:15px;">
+                    <h3>🔎 Area Safety Lookup</h3>
+                    <p class="card-desc">Check safety data for any point on the map.</p>
+                    <button id="check-my-area-btn" class="primary-btn" style="margin-top:8px;">📍 Check My Current Area</button>
+                    <div id="area-lookup-result" class="hidden" style="margin-top:12px;"></div>
+                </div>
+            </div>
+
+            <!-- TAB 3: COMMUNITY REPORT -->
+            <div id="report-tab" class="tab-content hidden">
+                <div class="glass-card">
+                    <h3>📢 Report Safety Incident</h3>
+                    <p class="card-desc">Help other women stay safe by sharing your experience.</p>
+
+                    <div class="form-row" style="margin-top:12px;">
+                        <label>Incident Type</label>
+                        <select id="report-incident-type" class="form-select">
+                            <option>Nothing unusual / Safe route</option>
+                            <option>Harassment</option>
+                            <option>Poor Lighting</option>
+                            <option>Stalking</option>
+                            <option>Chain Snatching</option>
+                            <option>Unsafe Area</option>
+                            <option>Assault</option>
+                            <option>General Safety Concern</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Safety Rating (1=Unsafe, 5=Very Safe)</label>
+                        <div class="star-rating" id="star-rating">
+                            <span class="star" data-val="1">★</span>
+                            <span class="star" data-val="2">★</span>
+                            <span class="star" data-val="3">★</span>
+                            <span class="star" data-val="4">★</span>
+                            <span class="star" data-val="5">★</span>
+                        </div>
+                        <input type="hidden" id="report-rating" value="3">
+                    </div>
+
+                    <div class="form-row">
+                        <label>Time of Incident</label>
+                        <select id="report-time" class="form-select">
+                            <option>Morning</option>
+                            <option>Afternoon</option>
+                            <option>Evening</option>
+                            <option>Night</option>
+                            <option>Late Night</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Description (optional)</label>
+                        <textarea id="report-description" class="form-textarea" rows="3" placeholder="Describe what happened..."></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Location</label>
+                        <button id="report-use-location-btn" class="secondary-btn">📍 Use My Current Location</button>
+                        <div id="report-location-status" style="font-size:0.8em;margin-top:6px;opacity:0.7;">No location set</div>
+                        <input type="hidden" id="report-lat" value="">
+                        <input type="hidden" id="report-lng" value="">
+                    </div>
+
+                    <button id="submit-report-btn" class="primary-btn" style="margin-top:12px;background:linear-gradient(135deg,#f59e0b,#ef4444);">
+                        📤 Submit Safety Report
+                    </button>
+                    <div id="report-status" class="hidden" style="margin-top:10px;"></div>
+                </div>
+
+                <!-- Recent community reports count -->
+                <div class="glass-card" style="margin-top:14px;">
+                    <h3>📊 Community Activity</h3>
+                    <div class="med-details">
+                        <div class="med-row"><strong>Community Reports:</strong> <span id="community-reports-count">–</span></div>
+                        <div class="med-row"><strong>Dataset Records:</strong> <span id="total-records-count">–</span></div>
+                        <div class="med-row"><strong>Avg Safety Score:</strong> <span id="avg-score-display">–</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: PROFILE -->
+            <div id="profile-tab" class="tab-content hidden">
+                <div class="glass-card">
+                    <h3>👤 Personal Details</h3>
+                    <div class="form-row">
+                        <label>Full Name</label>
+                        <input type="text" id="profile-name" placeholder="Full Name">
+                    </div>
+                    <div class="form-row">
+                        <label>Email</label>
+                        <input type="email" id="profile-email" placeholder="Email Address">
+                    </div>
+                    <div class="form-row">
+                        <label>Phone Number</label>
+                        <input type="text" id="profile-phone" placeholder="Emergency Phone">
+                    </div>
+                    <div class="form-row-grid">
+                        <div class="form-row">
+                            <label>Age</label>
+                            <input type="number" id="profile-age" placeholder="Age" min="1" max="120">
+                        </div>
+                        <div class="form-row">
+                            <label>Gender</label>
+                            <input type="text" id="profile-gender" placeholder="Gender">
+                        </div>
+                        <div class="form-row">
+                            <label>Blood Group</label>
+                            <input type="text" id="profile-blood" placeholder="Blood Group">
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top:20px;">🏥 Medical Information</h3>
+                    <div class="form-row">
+                        <label>Allergies</label>
+                        <input type="text" id="profile-allergies" placeholder="e.g. Penicillin">
+                    </div>
+                    <div class="form-row">
+                        <label>Current Medications</label>
+                        <input type="text" id="profile-medications" placeholder="e.g. Asthma inhaler">
+                    </div>
+                    <div class="form-row">
+                        <label>Health Conditions</label>
+                        <input type="text" id="profile-conditions" placeholder="e.g. Asthma">
+                    </div>
+
+                    <h3 style="margin-top:20px;">🚨 Trusted Contacts (Priority Queue)</h3>
+                    <div class="contact-priority-row">
+                        <span class="p-num">1</span>
+                        <input type="text" id="contact1-name" placeholder="Contact 1 Name" class="contact-name-input">
+                        <input type="text" id="contact1-phone" placeholder="Contact 1 Phone" class="contact-phone-input">
+                    </div>
+                    <div class="contact-priority-row" style="margin-top:10px;">
+                        <span class="p-num">2</span>
+                        <input type="text" id="contact2-name" placeholder="Contact 2 Name" class="contact-name-input">
+                        <input type="text" id="contact2-phone" placeholder="Contact 2 Phone" class="contact-phone-input">
+                    </div>
+                    <div class="contact-priority-row" style="margin-top:10px;">
+                        <span class="p-num">3</span>
+                        <input type="text" id="contact3-name" placeholder="Contact 3 Name" class="contact-name-input">
+                        <input type="text" id="contact3-phone" placeholder="Contact 3 Phone" class="contact-phone-input">
+                    </div>
+
+                    <button id="save-profile-btn" class="primary-btn" style="margin-top:20px;">💾 Save Emergency Profile</button>
+                </div>
+            </div>
+
+            <!-- TAB 5: EVIDENCE VAULT -->
+            <div id="vault-tab" class="tab-content hidden">
+                <div class="glass-card">
+                    <h3>📂 Audio Evidence History</h3>
+                    <p class="card-desc" style="font-size:0.85em;opacity:0.8;margin-bottom:12px;">Voice recordings gathered during SOS alarms.</p>
+                    <div id="audio-history-list" class="audio-list-container">
+                        <div class="empty-state">No audio recordings captured yet.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Area Info Card -->
+            <div id="area-info-card" class="glass-card hidden" style="margin-top:15px;border-color:var(--accent);">
+                <h3>📍 Area Safety Details</h3>
+                <div class="med-details">
+                    <div class="med-row"><strong>Area:</strong> <span id="area-name">N/A</span></div>
+                    <div class="med-row"><strong>Safety Score:</strong> <span id="area-safety-score" style="color:var(--accent);font-weight:bold;">N/A</span></div>
+                    <div class="med-row"><strong>Crime Score:</strong> <span id="area-crime-score">N/A</span></div>
+                    <div class="med-row"><strong>Police:</strong> <span id="area-police">N/A</span></div>
+                    <div class="med-row"><strong>Hospital:</strong> <span id="area-hospital">N/A</span></div>
+                    <div class="med-row"><strong>Street Lighting:</strong> <span id="area-lighting">N/A</span></div>
+                </div>
+            </div>
+
+            <button id="sos-btn" class="sos-btn">🚨 SOS / HELP</button>
+            <div class="sidebar-credit" style="margin-top:20px;text-align:center;font-size:0.8em;opacity:0.7;">
+                <p>Built with ❤️ by TechnoPandas</p>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map">
+            <div id="warning-banner" class="warning-banner hidden">
+                ⚠️ Caution: You are entering a lower safety zone.
+            </div>
+            <div class="map-legend">
+                <h4>Safety Legend</h4>
+                <div class="legend-item"><span class="legend-color safe"></span>Safe (80–100)</div>
+                <div class="legend-item"><span class="legend-color moderate"></span>Moderate (60–79)</div>
+                <div class="legend-item"><span class="legend-color risky"></span>Risky (&lt;60)</div>
+            </div>
+            <button id="scan-btn" class="map-floating-btn">🛡️ Scan Safe Spots</button>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="about-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>About SheMovesSafe 🛡️</h2>
+            <p class="mission-text">Our mission is to create a safer world for women by providing intelligent, real-time navigation that prioritizes safety over speed — not just the fastest route, but the <strong>safest</strong> one.</p>
+
+            <div class="features-grid">
+                <div class="feature-item">
+                    <span class="feature-icon">🗺️</span>
+                    <h3>3-Route Navigation</h3>
+                    <p>Three color-coded routes — Green (Safest), Yellow (Moderate), Red (Unsafe) — displayed simultaneously on the map.</p>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔍</span>
+                    <h3>Smart Analysis</h3>
+                    <p>AI-powered risk scoring using 20,000+ real crime and safety records across India.</p>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🚨</span>
+                    <h3>SOS Integration</h3>
+                    <p>One-tap emergency alerts with GPS location, priority contact calling, and auto audio recording.</p>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📢</span>
+                    <h3>Community Reports</h3>
+                    <p>Real-time safety feedback from the community that dynamically updates route scores.</p>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⏱️</span>
+                    <h3>Check-In Timer</h3>
+                    <p>Set a countdown timer — if you don't check in, SOS triggers automatically.</p>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎙️</span>
+                    <h3>Evidence Vault</h3>
+                    <p>Voice recordings captured during SOS are saved securely for later review.</p>
+                </div>
+            </div>
+
+            <!-- Team Section -->
+            <div class="team-section">
+                <h3>Made by TechnoPandas 🐼</h3>
+                <p style="margin-bottom:16px;opacity:0.8;">A team of passionate developers building technology for social good.</p>
+                <div class="team-cards">
+                    <div class="team-card">
+                        <div class="team-avatar">👩‍💻</div>
+                        <div class="team-name">Shravani Dhuri</div>
+                        <div class="team-role">Developer</div>
+                    </div>
+                    <div class="team-card">
+                        <div class="team-avatar">👩‍💻</div>
+                        <div class="team-name">Shreya Boda</div>
+                        <div class="team-role">Developer</div>
+                    </div>
+                    <div class="team-card">
+                        <div class="team-avatar">👩‍💻</div>
+                        <div class="team-name">Manasvi Chauhan</div>
+                        <div class="team-role">Developer</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Modal -->
+    <div id="contact-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal contact-close">&times;</span>
+            <h2>Contact Us 📞</h2>
+            <p class="mission-text">Reach out for support, feedback, or partnerships. We'd love to hear from you!</p>
+
+            <div class="contact-grid" style="display:grid;gap:16px;text-align:left;">
+                <div class="contact-item" style="background:rgba(255,255,255,0.05);padding:15px;border-radius:10px;">
+                    <h3>📧 Email</h3>
+                    <p>hello@shemovessafe.com</p>
+                    <p style="opacity:0.7;">support@technopandas.org</p>
+                </div>
+                <div class="contact-item" style="background:rgba(255,255,255,0.05);padding:15px;border-radius:10px;">
+                    <h3>🏢 Location</h3>
+                    <p>Tech Park, Mumbai 400001<br>Maharashtra, India</p>
+                </div>
+                <div class="contact-item" style="background:rgba(255,255,255,0.05);padding:15px;border-radius:10px;">
+                    <h3>📱 Socials</h3>
+                    <p>Instagram: @TechnoPandas_Official</p>
+                    <p style="opacity:0.7;">Twitter/X: @SheMovesSafe</p>
+                </div>
+            </div>
+
+            <!-- Team contacts -->
+            <div style="margin-top:22px;">
+                <h3 style="font-size:1em;margin-bottom:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">🐼 Team TechnoPandas</h3>
+                <div class="team-cards">
+                    <div class="team-card">
+                        <div class="team-avatar">👩‍💻</div>
+                        <div class="team-name">Shravani Dhuri</div>
+                        <div class="team-role">TechnoPandas</div>
+                    </div>
+                    <div class="team-card">
+                        <div class="team-avatar">👩‍💻</div>
+                        <div class="team-name">Shreya Boda</div>
+                        <div class="team-role">TechnoPandas</div>
+                    </div>
+                    <div class="team-card">
+                        <div class="team-avatar">👩‍💻</div>
+                        <div class="team-name">Manasvi Chauhan</div>
+                        <div class="team-role">TechnoPandas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SOS Modal -->
+    <div id="sos-modal" class="modal hidden">
+        <div class="modal-content sos-content glass-card neon-border-red" style="max-width:800px;border:2px solid #ef4444;">
+            <span class="close-modal sos-close">&times;</span>
+            <h2 class="sos-title" style="color:#ef4444;text-align:center;margin-bottom:20px;">🚨 EMERGENCY SOS ACTIVATED 🚨</h2>
+            <div class="emergency-grid">
+                <div class="emergency-left">
+                    <div class="priority-calling-card">
+                        <h3>📞 Calling Priority Contacts</h3>
+                        <div id="calling-status-list" class="calling-list">
+                            <div class="queue-item active" id="queue-c1">
+                                <span class="q-dot pulse-red"></span>
+                                <div class="q-info"><h4 id="call-contact1-name">Contact 1</h4><p id="call-contact1-status">Calling...</p></div>
+                                <span class="q-timer" id="call-contact1-timer">20s</span>
+                            </div>
+                            <div class="queue-item pending" id="queue-c2">
+                                <span class="q-dot"></span>
+                                <div class="q-info"><h4 id="call-contact2-name">Contact 2</h4><p id="call-contact2-status">Queued</p></div>
+                                <span class="q-timer" id="call-contact2-timer">20s</span>
+                            </div>
+                            <div class="queue-item pending" id="queue-c3">
+                                <span class="q-dot"></span>
+                                <div class="q-info"><h4 id="call-contact3-name">Contact 3</h4><p id="call-contact3-status">Queued</p></div>
+                                <span class="q-timer" id="call-contact3-timer">20s</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="audio-recording-evidence-card" style="margin-top:15px;">
+                        <div class="rec-title-row">
+                            <span class="pulse-rec-dot"></span>
+                            <h3>Recording Evidence...</h3>
+                        </div>
+                        <div class="rec-timer" id="rec-duration">00:00</div>
+                        <div class="rec-soundwave" id="rec-soundwave">
+                            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="emergency-right">
+                    <div class="medical-emergency-card">
+                        <h3>🩹 Medical Information Card</h3>
+                        <div class="med-details">
+                            <div class="med-row"><strong>Name:</strong> <span id="med-card-name">Loading...</span></div>
+                            <div class="med-row-grid">
+                                <div><strong>Blood Group:</strong> <span id="med-card-blood">Loading...</span></div>
+                                <div><strong>Age:</strong> <span id="med-card-age">Loading...</span></div>
+                                <div><strong>Gender:</strong> <span id="med-card-gender">Loading...</span></div>
+                            </div>
+                            <div class="med-row"><strong>Allergies:</strong> <span id="med-card-allergies">Loading...</span></div>
+                            <div class="med-row"><strong>Medications:</strong> <span id="med-card-meds">Loading...</span></div>
+                            <div class="med-row"><strong>Conditions:</strong> <span id="med-card-conditions">Loading...</span></div>
+                        </div>
+                    </div>
+                    <div class="emergency-actions" style="margin-top:15px;display:grid;gap:10px;">
+                        <button id="whatsapp-share-btn" class="emergency-action-btn whatsapp">
+                            <span>💬 Send WhatsApp Alert</span>
+                        </button>
+                        <a href="tel:100" class="emergency-action-btn police-call">
+                            <span>📞 Call Police (Dial 100)</span>
+                        </a>
+                        <button id="deactivate-sos-btn" class="emergency-action-btn resolve">
+                            <span>🛡️ Resolve Emergency (Stop SOS)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p id="location-status" style="margin-top:15px;font-size:0.85em;color:#ff8b8b;text-align:center;">Waiting for coordinates...</p>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
